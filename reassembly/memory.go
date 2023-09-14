@@ -183,21 +183,26 @@ func (p *StreamPool) getHalf(k key) (*connection, *halfconnection, *halfconnecti
 // does not already exist, returns nil.  This allows us to check for a
 // connection without actually creating one if it doesn't already exist.
 func (p *StreamPool) getConnection(k key, end bool, ts time.Time, tcp *layers.TCP, ac AssemblerContext) (*connection, *halfconnection, *halfconnection) {
+	// first pass: read-only lock
 	p.mu.RLock()
 	conn, half, rev := p.getHalf(k)
 	p.mu.RUnlock()
 	if end || conn != nil {
 		return conn, half, rev
 	}
+
+	// second pass: look again, but with a write lock this time
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	conn2, half2, rev2 := p.getHalf(k)
-	if conn2 != nil {
-		if conn2.key != k {
+	conn, half, rev = p.getHalf(k)
+	if conn != nil {
+		if conn.key != k {
 			panic("FIXME: other dir added in the meantime...")
 		}
-		return conn2, half2, rev2
+		return conn, half, rev
 	}
+
+	// OK, no connection found, let's create a new one
 	// FIXME: delete s after it's used to create the connection?
 	s := p.factory.New(k[0], k[1], tcp, ac)
 	conn, half, rev = p.newConnection(k, s, ts)
