@@ -189,7 +189,6 @@ func (p *StreamPool) getConnection(k key, end bool, ts time.Time, tcp *layers.TC
 	if end || conn != nil {
 		return conn, half, rev
 	}
-	s := p.factory.New(k[0], k[1], tcp, ac)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	conn2, half2, rev2 := p.getHalf(k)
@@ -197,9 +196,10 @@ func (p *StreamPool) getConnection(k key, end bool, ts time.Time, tcp *layers.TC
 		if conn2.key != k {
 			panic("FIXME: other dir added in the meantime...")
 		}
-		// FIXME: delete s ?
 		return conn2, half2, rev2
 	}
+	// FIXME: delete s after it's used to create the connection?
+	s := p.factory.New(k[0], k[1], tcp, ac)
 	conn, half, rev = p.newConnection(k, s, ts)
 	p.conns[k] = conn
 	return conn, half, rev
